@@ -83,9 +83,9 @@ data:
 
   # Bolt keep alive
   # this helps to ensure that LoadBalancers do not close bolt connections that are in use but appear idle
-  dbms.connector.bolt.connection_keep_alive: "30s"
-  dbms.connector.bolt.connection_keep_alive_for_requests: "ALL"
-  dbms.connector.bolt.connection_keep_alive_streaming_scheduling_interval: "30s"
+  server.bolt.connection_keep_alive: "30s"
+  server.bolt.connection_keep_alive_for_requests: "ALL"
+  server.bolt.connection_keep_alive_streaming_scheduling_interval: "30s"
 
   # If we set default advertised address it over-rides the bolt address used to populate the browser in a really annoying way
   # dbms.default_advertised_address: "$(bash -c 'echo ${SERVICE_DOMAIN}')"
@@ -96,8 +96,7 @@ data:
 
 
   # Other
-  dbms.logs.user.stdout_enabled: "false"
-  unsupported.dbms.ssl.system.ignore_dot_files: "true"
+  internal.dbms.ssl.system.ignore_dot_files: "true"
 
   {{- if $clusterEnabled }}
   # Clustering
