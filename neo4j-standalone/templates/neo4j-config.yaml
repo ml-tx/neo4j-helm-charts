@@ -1,5 +1,6 @@
 {{- $isEnterprise := required "neo4j.edition must be specified" .Values.neo4j.edition | regexMatch "(?i)enterprise" -}}
-{{- $clusterEnabled := or ( index .Values.config "dbms.mode" | default "" | regexMatch "(?i)core|replica" ) ( index .Values.config "dbms.clustering.enable" | default "" | regexMatch "(?i)true|yes" ) }}
+{{/*{{- $clusterEnabled := or ( index .Values.config "dbms.mode" | default "" | regexMatch "(?i)core|replica" ) ( index .Values.config "dbms.clustering.enable" | default "" | regexMatch "(?i)true|yes" ) }}*/}}
+{{- $clusterEnabled := not (eq (index .Values.config "dbms.cluster.minimum_initial_system_primaries_count" | default "1") "1" ) }}
 {{- template "neo4j.checkLicenseAgreement" . -}}
 # Neo4j config values that are required for neo4j to work correctly in Kubernetes, these are not overridden by user-provided values
 apiVersion: v1
@@ -105,7 +106,7 @@ data:
   #causal_clustering.kubernetes.service_port_name: "tcp-discovery"
   dbms.kubernetes.service_port_name: "tcp-discovery"
   #causal_clustering.kubernetes.label_selector: "app={{ template "neo4j.appName" . }},helm.neo4j.com/service=internals,helm.neo4j.com/dbms.mode=CORE"
-  dbms.kubernetes.label_selector: "app={{ template "neo4j.appName" . }},helm.neo4j.com/service=internals,helm.neo4j.com/dbms.mode=CORE"
+  dbms.kubernetes.label_selector: "app={{ template "neo4j.appName" . }},helm.neo4j.com/service=internals"
   dbms.routing.default_router: "SERVER"
   dbms.routing.client_side.enforce_for_domains: "*.{{ .Values.clusterDomain }}"
   dbms.routing.enabled: "true"
