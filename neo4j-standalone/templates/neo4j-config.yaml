@@ -103,8 +103,8 @@ data:
   dbms.cluster.discovery.type: K8S
   #causal_clustering.kubernetes.service_port_name: "tcp-discovery"
   dbms.kubernetes.service_port_name: "tcp-discovery"
-  #causal_clustering.kubernetes.label_selector: "app={{ template "neo4j.appName" . }},helm.neo4j.com/service=internals,helm.neo4j.com/dbms.mode=CORE"
-  dbms.kubernetes.label_selector: "app={{ template "neo4j.appName" . }},helm.neo4j.com/service=internals"
+{{/*  #causal_clustering.kubernetes.label_selector: "app={{ template "neo4j.appName" . }},helm.neo4j.com/service=internals,helm.neo4j.com/dbms.mode=CORE"*/}}
+  dbms.kubernetes.label_selector: "helm.neo4j.com/service=internals"
   dbms.routing.default_router: "SERVER"
   dbms.routing.client_side.enforce_for_domains: "*.{{ .Values.clusterDomain }}"
   dbms.routing.enabled: "true"
