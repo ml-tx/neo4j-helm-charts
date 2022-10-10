@@ -1,12 +1,21 @@
 {{- $clusterEnabled := eq (include "neo4j.isClusterEnabled" .) "true" }}
 {{- $ignored := required "neo4j.name is required" .Values.neo4j.name }}
 {{- $isEnterprise := required "neo4j.edition must be specified" .Values.neo4j.edition | regexMatch "(?i)enterprise" -}}
-
 {{- $loadBalancer := (lookup "v1" "Service" .Release.Namespace (printf "%s-lb-neo4j" (include "neo4j.appName" $))) }}
 {{- $loadBalancerExists := $loadBalancer | all }}
+{{- if $clusterEnabled -}}
+  {{- $loadBalancerLabels :=  $loadBalancer.metadata.labels -}}
+  {{- $loadBalancerSelector :=  $loadBalancer.spec.selector -}}
+  {{- if hasKey $loadBalancerSelector "helm.neo4j.com/clustering" -}}
+    {{- if eq ((get $loadBalancerSelector "helm.neo4j.com/clustering" ) "false") -}}
+      {{- if eq ((get $loadBalancerSelector "app" ) (include "neo4j.appName" $)) -}}
+        {{ fail (printf "%v" "A load balancer already exists with this neo4j.name" ) }}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 
 {{- if and (not $loadBalancerExists) ($isEnterprise) -}}
-
 {{- $defaultSpec := include "neo4j.services.neo4j.defaultSpec" . | fromYaml }}
 {{- $spec := get $defaultSpec .Values.services.neo4j.spec.type | merge .Values.services.neo4j.spec  }}
 # Service for applications that need access to neo4j
@@ -78,6 +87,7 @@ spec:
       targetPort: 6000
     {{- end }}
   selector:
+    app: "{{ template "neo4j.appName" . }}"
     {{- if $clusterEnabled }}
     helm.neo4j.com/clustering: "true"
     {{- else }}
