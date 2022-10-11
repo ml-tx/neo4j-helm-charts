@@ -76,9 +76,10 @@ data:
   {{- include "neo4j.configYaml" $confFile | nindent 2 }}
 
   # Helm defaults
-{{/*  #dbms.mode: "{{ index .Values.config "dbms.mode" | default "SINGLE" | upper }}"*/}}
-{{/*  initial.server.mode_constraint: "{{ index .Values.config "initial.server.mode_constraint" | default "NONE" | upper }}"*/}}
-{{/*  initial.dbms.default_primaries_count: "1"*/}}
+  {{- if $clusterEnabled }}
+    {{- $primariesCount := index .Values.config "dbms.cluster.minimum_initial_system_primaries_count" }}
+  initial.dbms.default_primaries_count: "{{ $primariesCount }}"
+  {{- end }}
 
   # Bolt keep alive
   # this helps to ensure that LoadBalancers do not close bolt connections that are in use but appear idle

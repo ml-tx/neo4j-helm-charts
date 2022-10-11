@@ -1,21 +1,22 @@
 {{- $clusterEnabled := eq (include "neo4j.isClusterEnabled" .) "true" }}
 {{- $ignored := required "neo4j.name is required" .Values.neo4j.name }}
 {{- $isEnterprise := required "neo4j.edition must be specified" .Values.neo4j.edition | regexMatch "(?i)enterprise" -}}
+{{- $isLoadBalancerEnabled := index .Values.services.neo4j.enabled }}
 {{- $loadBalancer := (lookup "v1" "Service" .Release.Namespace (printf "%s-lb-neo4j" (include "neo4j.appName" $))) }}
 {{- $loadBalancerExists := $loadBalancer | all }}
-{{- if $clusterEnabled -}}
-  {{- $loadBalancerLabels :=  $loadBalancer.metadata.labels -}}
+
+{{- if and $loadBalancerExists $isLoadBalancerEnabled -}}
   {{- $loadBalancerSelector :=  $loadBalancer.spec.selector -}}
   {{- if hasKey $loadBalancerSelector "helm.neo4j.com/clustering" -}}
-    {{- if eq ((get $loadBalancerSelector "helm.neo4j.com/clustering" ) "false") -}}
-      {{- if eq ((get $loadBalancerSelector "app" ) (include "neo4j.appName" $)) -}}
-        {{ fail (printf "%v" "A load balancer already exists with this neo4j.name" ) }}
+      {{- if eq (get $loadBalancerSelector "helm.neo4j.com/clustering") "false" -}}
+        {{- if eq (get $loadBalancerSelector "app") (include "neo4j.appName" $) -}}
+          {{ fail (printf "%s %v %s" "A Neo4j installation already exists in this namespace with the name" .Values.neo4j.name "Please use a different neo4j name using --set neo4j.name") }}
       {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
 
-{{- if and (not $loadBalancerExists) ($isEnterprise) -}}
+{{- if and (not $loadBalancerExists) ($isEnterprise) ($isLoadBalancerEnabled) -}}
 {{- $defaultSpec := include "neo4j.services.neo4j.defaultSpec" . | fromYaml }}
 {{- $spec := get $defaultSpec .Values.services.neo4j.spec.type | merge .Values.services.neo4j.spec  }}
 # Service for applications that need access to neo4j
