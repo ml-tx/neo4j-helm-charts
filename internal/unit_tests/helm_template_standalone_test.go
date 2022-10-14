@@ -12,7 +12,7 @@ import (
 func TestDefaultCommunityHelmTemplate(t *testing.T) {
 	t.Parallel()
 
-	manifest, err := model.HelmTemplate(t, model.StandaloneHelmChart, requiredDataMode)
+	manifest, err := model.HelmTemplate(t, model.Neo4jHelmChartCommunityAndEnterprise, requiredDataMode, useNeo4jStandaloneName...)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -38,7 +38,7 @@ func TestDefaultCommunityHelmTemplate(t *testing.T) {
 func TestExplicitCommunityHelmTemplate(t *testing.T) {
 	t.Parallel()
 
-	manifest, err := model.HelmTemplate(t, model.StandaloneHelmChart, requiredDataMode, useCommunity...)
+	manifest, err := model.HelmTemplate(t, model.Neo4jHelmChartCommunityAndEnterprise, requiredDataMode, append(useCommunity, useNeo4jStandaloneName...)...)
 	if !assert.NoError(t, err) {
 		return
 	}

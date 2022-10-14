@@ -66,7 +66,7 @@ func TestPopulateFromFile(t *testing.T) {
 func TestJvmAdditionalConfig(t *testing.T) {
 	t.Parallel()
 
-	doTestCase := func(t *testing.T, chart model.Neo4jHelmChart, edition string) {
+	doTestCase := func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense,
 			"-f", "internal/resources/testData/jvmAdditionalSettings.yaml",
 			"--set", "neo4j.edition="+edition,
@@ -96,7 +96,7 @@ func TestJvmAdditionalConfig(t *testing.T) {
 func TestMetaspaceConfigs(t *testing.T) {
 	t.Parallel()
 
-	doTestCase := func(t *testing.T, chart model.Neo4jHelmChart, edition string) {
+	doTestCase := func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense,
 			"-f", "internal/resources/testData/metaspaceconfigs.yaml",
 			"--set", "neo4j.edition="+edition,

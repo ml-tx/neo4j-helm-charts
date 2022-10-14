@@ -13,6 +13,8 @@ type ReleaseName interface {
 	UserConfigMapName() string
 	InternalServiceName() string
 	DefaultConfigMapName() string
+	UserLogsConfigMapName() string
+	ServerLogsConfigMapName() string
 }
 
 func NewReleaseName(name string) ReleaseName {
@@ -50,6 +52,13 @@ func (r *releaseName) UserConfigMapName() string {
 	return string(*r) + "-user-config"
 }
 
+func (r *releaseName) UserLogsConfigMapName() string {
+	return string(*r) + "-user-logs-config"
+}
+
+func (r *releaseName) ServerLogsConfigMapName() string {
+	return string(*r) + "-server-logs-config"
+}
 func (r *releaseName) InternalServiceName() string {
 	return string(*r) + "-internals"
 }
@@ -101,6 +110,13 @@ func (r *clusterMemberReleaseName) EnvConfigMapName() string {
 
 func (r *clusterMemberReleaseName) UserConfigMapName() string {
 	return r.memberName.UserConfigMapName()
+}
+
+func (r *clusterMemberReleaseName) UserLogsConfigMapName() string {
+	return r.memberName.UserLogsConfigMapName()
+}
+func (r *clusterMemberReleaseName) ServerLogsConfigMapName() string {
+	return r.memberName.ServerLogsConfigMapName()
 }
 
 func (r *clusterMemberReleaseName) InternalServiceName() string {
