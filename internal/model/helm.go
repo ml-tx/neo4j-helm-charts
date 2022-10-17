@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	. "github.com/neo4j/helm-charts/internal/helpers"
 	"github.com/neo4j/helm-charts/internal/resources"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"k8s.io/utils/env"
 	"log"
@@ -173,4 +174,20 @@ func HeadlessServiceHelmCommand(helmCommand string, releaseName ReleaseName, ext
 	}
 
 	return helmArgs
+}
+
+func HelmReleaseValues(t *testing.T) (ReleaseValues, error) {
+	helmGetValuesArgs := []string{"get", "values", "-a", DefaultHelmTemplateReleaseName.String()}
+	program := "helm"
+	t.Logf("running: %s %s\n", program, helmGetValuesArgs)
+	stdout, stderr, err := RunCommand(exec.Command(program, helmGetValuesArgs...))
+	releaseValues := ReleaseValues{}
+	err = yaml.Unmarshal(stdout, &releaseValues)
+	if err != nil {
+		return releaseValues, multierror.Append(errors.New("Error running helm get values"), err, fmt.Errorf("stdout: %s\nstderr: %s", stdout, stderr))
+	}
+	if len(stderr) > 0 {
+		return releaseValues, multierror.Append(errors.New("Error running helm get values"), err, fmt.Errorf("stdout: %s\nstderr: %s", stdout, stderr))
+	}
+	return releaseValues, err
 }

@@ -187,8 +187,8 @@ metadata:
     {{- include "neo4j.labels" $.Values.neo4j | indent 4 }}
 data:
   server-logs.xml: |-
-    {{- if not (empty $.Values.logs.server_logs_xml) -}}
-        {{ $.Values.logs.server_logs_xml | nindent 4 }}
+    {{- if not (empty $.Values.logs.serverLogsXml) -}}
+        {{ $.Values.logs.serverLogsXml | nindent 4 }}
     {{- else -}}
         {{ .Files.Get "server-logs.xml" | nindent 4 }}
     {{- end }}
@@ -204,8 +204,8 @@ metadata:
     {{- include "neo4j.labels" $.Values.neo4j | indent 4 }}
 data:
   user-logs.xml: |-
-    {{- if not (empty $.Values.logs.user_logs_xml) -}}
-        {{ $.Values.logs.user_logs_xml | nindent 4 }}
+    {{- if not (empty $.Values.logs.userLogsXml) -}}
+        {{ $.Values.logs.userLogsXml | nindent 4 }}
     {{- else -}}
         {{ .Files.Get "user-logs.xml" | nindent 4 }}
     {{- end }}

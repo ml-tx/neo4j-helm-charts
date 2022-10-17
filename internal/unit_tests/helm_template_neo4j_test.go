@@ -52,15 +52,23 @@ func TestNeo4jInternalPorts(t *testing.T) {
 		7000: 7000,
 	}
 
-	core := model.NewReleaseName("foo")
-
-	args := append(useEnterprise, useDataModeAndAcceptLicense...)
-	neo4jManifest, err := model.HelmTemplateForRelease(t, core, model.HelmChart, args, useNeo4jClusterName...)
+	neo4j := model.NewReleaseName("foo")
+	desiredFeatures := [][]string{
+		useEnterprise,
+		useDataModeAndAcceptLicense,
+		useNeo4jClusterName,
+		enableCluster,
+	}
+	var args []string
+	for _, a := range desiredFeatures {
+		args = append(args, a...)
+	}
+	neo4jManifest, err := model.HelmTemplateForRelease(t, neo4j, model.HelmChart, args)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	internalService := neo4jManifest.OfTypeWithName(&v1.Service{}, core.InternalServiceName()).(*v1.Service)
+	internalService := neo4jManifest.OfTypeWithName(&v1.Service{}, neo4j.InternalServiceName()).(*v1.Service)
 
 	checkPortsMatchExpected(t, expectedPorts, internalService)
 }
@@ -69,14 +77,23 @@ func TestNeo4jInternalPorts(t *testing.T) {
 func TestNeo4jPanicOnShutDownConfig(t *testing.T) {
 	t.Parallel()
 
-	clusterCore := model.NewReleaseName("foo")
-
-	clusterCoreManifest, err := model.HelmTemplateForRelease(t, clusterCore, model.HelmChart, useDataModeAndAcceptLicense)
+	neo4j := model.NewReleaseName("foo")
+	desiredFeatures := [][]string{
+		useEnterprise,
+		useDataModeAndAcceptLicense,
+		useNeo4jClusterName,
+		enableCluster,
+	}
+	var args []string
+	for _, a := range desiredFeatures {
+		args = append(args, a...)
+	}
+	neo4jManifest, err := model.HelmTemplateForRelease(t, neo4j, model.HelmChart, args)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	defaultConfigMap := clusterCoreManifest.OfTypeWithName(&v1.ConfigMap{}, clusterCore.DefaultConfigMapName()).(*v1.ConfigMap)
+	defaultConfigMap := neo4jManifest.OfTypeWithName(&v1.ConfigMap{}, neo4j.DefaultConfigMapName()).(*v1.ConfigMap)
 	assert.Contains(t, defaultConfigMap.Data, "server.panic.shutdown_on_panic")
 	assert.Contains(t, defaultConfigMap.Data["server.panic.shutdown_on_panic"], "true")
 }
@@ -84,12 +101,21 @@ func TestNeo4jPanicOnShutDownConfig(t *testing.T) {
 // TestNeo4jServerAndUserLogsConfig checks whether the server and user logs are set in the respective conf files.
 func TestNeo4jServerAndUserLogsConfig(t *testing.T) {
 	t.Parallel()
-
+	serverLogsXml := []string{"--set", "logs.serverLogsXml=\"unit test case to test it\""}
+	userLogsXml := []string{"--set", "logs.userLogsXml=\"unit test case to test it\""}
 	neo4j := model.NewReleaseName("foo")
-	server_logs_xml := []string{"--set", "logs.server_logs_xml=\"unit test case to test it\""}
-	user_logs_xml := []string{"--set", "logs.user_logs_xml=\"unit test case to test it\""}
-	args := append(useNeo4jClusterName, server_logs_xml...)
-	args = append(args, user_logs_xml...)
+	desiredFeatures := [][]string{
+		useEnterprise,
+		useDataModeAndAcceptLicense,
+		useNeo4jClusterName,
+		enableCluster,
+		serverLogsXml,
+		userLogsXml,
+	}
+	var args []string
+	for _, a := range desiredFeatures {
+		args = append(args, a...)
+	}
 
 	neo4jManifest, err := model.HelmTemplateForRelease(t, neo4j, model.HelmChart, useDataModeAndAcceptLicense, args...)
 	if !assert.NoError(t, err) {

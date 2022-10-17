@@ -16,8 +16,8 @@ func TestDefaultCommunityHelmTemplate(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-
-	checkNeo4jManifest(t, manifest)
+	assert.Len(t, manifest.OfType(&v1.ConfigMap{}), 6)
+	assert.Len(t, manifest.OfType(&v1.Service{}), 2)
 
 	neo4jStatefulSet := manifest.First(&appsv1.StatefulSet{}).(*appsv1.StatefulSet)
 	neo4jStatefulSet.GetName()
@@ -43,7 +43,8 @@ func TestExplicitCommunityHelmTemplate(t *testing.T) {
 		return
 	}
 
-	checkNeo4jManifest(t, manifest)
+	assert.Len(t, manifest.OfType(&v1.ConfigMap{}), 6)
+	assert.Len(t, manifest.OfType(&v1.Service{}), 2)
 
 	neo4jStatefulSet := manifest.First(&appsv1.StatefulSet{}).(*appsv1.StatefulSet)
 	neo4jStatefulSet.GetName()
