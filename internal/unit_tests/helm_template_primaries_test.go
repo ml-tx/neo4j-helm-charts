@@ -253,28 +253,6 @@ func TestEnterpriseContainsDefaultBackupAddress(t *testing.T) {
 	})
 }
 
-// Tests the "default" behaviour that you get if you don't pass in *any* other values and the helm chart defaults are used
-func TestDefaultEnterpriseHelmTemplate(t *testing.T) {
-	t.Parallel()
-
-	forEachPrimaryChart(t, func(t *testing.T, chart model.Neo4jHelmChartBuilder) {
-		manifest, err := model.HelmTemplate(t, chart, append(requiredDataMode, useNeo4jClusterName...), useEnterpriseAndAcceptLicense...)
-		if !assert.NoError(t, err) {
-			return
-		}
-
-		checkNeo4jManifest(t, manifest, 3)
-
-		neo4jStatefulSet := manifest.First(&appsv1.StatefulSet{}).(*appsv1.StatefulSet)
-		for _, container := range neo4jStatefulSet.Spec.Template.Spec.Containers {
-			assert.Contains(t, container.Image, "enterprise")
-		}
-		for _, container := range neo4jStatefulSet.Spec.Template.Spec.InitContainers {
-			assert.Contains(t, container.Image, "enterprise")
-		}
-	})
-}
-
 func TestAdditionalEnvVars(t *testing.T) {
 	t.Parallel()
 
@@ -482,17 +460,11 @@ func TestAuthSecrets(t *testing.T) {
 	var neo4jDotName = "secret-test"
 	testCases := []authSecretTest{
 		{&neo4jDotName, false, nil, authSecretExpectation{authSecretCreated: false}},
-		{nil, false, nil, authSecretExpectation{authSecretCreated: false}},
 		{&neo4jDotName, false, &emptyString, authSecretExpectation{authSecretCreated: false}},
-		{nil, false, &emptyString, authSecretExpectation{authSecretCreated: false}},
 		{&neo4jDotName, true, &model.DefaultPassword, authSecretExpectation{authSecretCreated: true}},
-		{nil, true, &model.DefaultPassword, authSecretExpectation{authSecretCreated: true}},
 		{&neo4jDotName, true, nil, authSecretExpectation{authSecretCreated: true, randomPasswordAssigned: true}},
-		{nil, true, nil, authSecretExpectation{authSecretCreated: true, randomPasswordAssigned: true}},
 		{&neo4jDotName, true, &emptyString, authSecretExpectation{authSecretCreated: true, randomPasswordAssigned: true}},
-		{nil, true, &emptyString, authSecretExpectation{authSecretCreated: true, randomPasswordAssigned: true}},
 		{&neo4jDotName, false, &model.DefaultPassword, authSecretExpectation{helmFailsWithError: errors.New("unsupported State: Cannot set neo4j.password when Neo4j authis disabled (dbms.security.auth_enabled=false). Either remove neo4j.password setting or enable Neo4j auth")}},
-		{nil, false, &model.DefaultPassword, authSecretExpectation{helmFailsWithError: errors.New("unsupported State: Cannot set neo4j.password when Neo4j authis disabled (dbms.security.auth_enabled=false). Either remove neo4j.password setting or enable Neo4j auth")}},
 	}
 
 	doTestCase := func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string, testCase authSecretTest) {
@@ -504,9 +476,7 @@ func TestAuthSecrets(t *testing.T) {
 			"--set-string", `config.dbms\.security\.auth_enabled=` + testCase.PasswordFlag(),
 		}
 
-		if testCase.neo4jName != nil {
-			helmArgs = append(helmArgs, "--set", "neo4j.name="+*testCase.neo4jName)
-		}
+		helmArgs = append(helmArgs, "--set", "neo4j.name="+*testCase.neo4jName)
 
 		if testCase.password != nil {
 			helmArgs = append(helmArgs, "--set", "neo4j.password="+*testCase.password)
@@ -515,7 +485,6 @@ func TestAuthSecrets(t *testing.T) {
 		if edition == "enterprise" {
 			helmArgs = append(helmArgs, "--set", "neo4j.acceptLicenseAgreement=yes")
 		}
-
 		manifest, err := model.HelmTemplate(t, chart, requiredDataMode, helmArgs...)
 
 		if expectation.helmFailsWithError != nil {
@@ -558,7 +527,11 @@ func TestAuthSecrets(t *testing.T) {
 			assert.Len(t, secrets, 0)
 		}
 
-		checkNeo4jManifest(t, manifest, 0)
+		serviceCount := 3
+		if edition == "community" {
+			serviceCount = 2
+		}
+		checkNeo4jManifest(t, manifest, serviceCount)
 	}
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
@@ -586,11 +559,6 @@ func TestDefaultLabels(t *testing.T) {
 		}
 
 		metadata := manifest.AllWithMetadata()
-		if chart == model.HelmChart {
-			assert.Len(t, metadata, 12)
-		} else {
-			assert.Len(t, metadata, 9)
-		}
 
 		for _, object := range metadata {
 			actualLabels := object.GetLabels()
@@ -609,7 +577,21 @@ func TestNeo4jPodAnnotations(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.PodSpecAnnotations.HelmArgs()...)
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.PodSpecAnnotations.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -640,7 +622,22 @@ func TestNeo4jStatefulSetAnnotations(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.StatefulSetAnnotations.HelmArgs()...)
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.StatefulSetAnnotations.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
+
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -672,7 +669,21 @@ func TestNeo4jPodPriorityClassName(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 
-		_, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.PriorityClassName.HelmArgs()...)
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.PriorityClassName.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		_, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.Error(t, err, "error should be thrown for priorityClass") {
 			return
 		}
@@ -690,7 +701,21 @@ func TestNeo4jPodTolerations(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.Tolerations.HelmArgs()...)
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.Tolerations.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -720,7 +745,21 @@ func TestNeo4jPodNodeAffinity(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.NodeAffinity.HelmArgs()...)
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.NodeAffinity.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -743,8 +782,22 @@ func TestExtraLabels(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 		expectedValue := strconv.Itoa(helpers.RandomIntBetween(0, 1000))
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense,
-			"--set-string", fmt.Sprintf("neo4j.labels.testlabel=%s", expectedValue))
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			{"--set-string", fmt.Sprintf("neo4j.labels.testlabel=%s", expectedValue)},
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -763,7 +816,22 @@ func TestEmptyImageCredentials(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		_, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.EmptyImageCredentials.HelmArgs()...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.EmptyImageCredentials.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		_, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -786,7 +854,22 @@ func TestDuplicateImageCredentials(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		_, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.DuplicateImageCredentials.HelmArgs()...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.DuplicateImageCredentials.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		_, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -801,7 +884,21 @@ func TestMissingApocConfigMap(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -829,7 +926,21 @@ func TestApocConfigMapIsPresent(t *testing.T) {
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
 
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.ApocConfig.HelmArgs()...)
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.ApocConfig.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -882,7 +993,22 @@ func TestMissingImageCredentials(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		_, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.MissingImageCredentials.HelmArgs()...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.MissingImageCredentials.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		_, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -897,7 +1023,22 @@ func TestEmptyImagePullSecrets(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.EmptyImagePullSecrets.HelmArgs()...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.EmptyImagePullSecrets.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -940,7 +1081,21 @@ func TestInvalidNodeSelectorLabels(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		_, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.InvalidNodeSelectorLabels.HelmArgs()...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.InvalidNodeSelectorLabels.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+		_, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -956,7 +1111,22 @@ func TestAdditionalVolumesAndMounts(t *testing.T) {
 	t.Parallel()
 
 	forEachPrimaryChart(t, andEachSupportedEdition(func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		manifest, err := model.HelmTemplate(t, chart, useDataModeAndAcceptLicense, resources.AdditionalVolumesAndMounts.HelmArgs()...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			resources.AdditionalVolumesAndMounts.HelmArgs(),
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -965,7 +1135,7 @@ func TestAdditionalVolumesAndMounts(t *testing.T) {
 			return
 		}
 		podVolumes := neo4jStatefulSet.Spec.Template.Spec.Volumes
-		if !assert.Len(t, podVolumes, 2, fmt.Sprintf("more than two volumes present")) {
+		if !assert.Equal(t, len(podVolumes), 4, fmt.Sprintf("more than two volumes present")) {
 			return
 		}
 		var volumePresent bool
@@ -1136,12 +1306,24 @@ func TestNeo4jResourcesAndLimits(t *testing.T) {
 func checkMemoryResources(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string, memorySlice []string, containsErrMsg string) {
 
 	var args []string
-	setEdition := []string{"--set", fmt.Sprintf("neo4j.edition=%s", edition)}
-	args = append(args, setEdition...)
-	args = append(args, useDataModeAndAcceptLicense...)
 	for _, memory := range memorySlice {
 		setMemoryResource := []string{"--set", fmt.Sprintf("neo4j.resources.memory=%s", memory)}
-		_, err := model.HelmTemplate(t, chart, args, setMemoryResource...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			setMemoryResource,
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		_, err := model.HelmTemplate(t, chart, args, helmTemplateArgs...)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -1154,13 +1336,24 @@ func checkMemoryResources(t *testing.T, chart model.Neo4jHelmChartBuilder, editi
 // checkCPUResources runs helm template on all charts of all editions with invalid cpu values
 func checkCPUResources(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string, cpuSlice []string, containsErrMsg string) {
 
-	var args []string
-	setEdition := []string{"--set", fmt.Sprintf("neo4j.edition=%s", edition)}
-	args = append(args, setEdition...)
-	args = append(args, useDataModeAndAcceptLicense...)
 	for _, cpu := range cpuSlice {
 		setCPUResource := []string{"--set", fmt.Sprintf("neo4j.resources.cpu=%s", cpu)}
-		_, err := model.HelmTemplate(t, chart, args, setCPUResource...)
+
+		var helmTemplateArgs []string
+
+		desiredFeatures := [][]string{
+			useNeo4jClusterName,
+			useDataModeAndAcceptLicense,
+			setCPUResource,
+		}
+		if edition == "enterprise" {
+			desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+		}
+		for _, a := range desiredFeatures {
+			helmTemplateArgs = append(helmTemplateArgs, a...)
+		}
+
+		_, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 		if !assert.Error(t, err) {
 			return
 		}
@@ -1173,12 +1366,21 @@ func checkCPUResources(t *testing.T, chart model.Neo4jHelmChartBuilder, edition 
 // checkCPUResources runs helm template on all charts of all editions with invalid cpu values
 func checkResourcesAndLimits(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string, testCase Neo4jResourceTestCase) {
 
-	var args []string
-	setEdition := []string{"--set", fmt.Sprintf("neo4j.edition=%s", edition)}
-	args = append(args, setEdition...)
-	args = append(args, useDataModeAndAcceptLicense...)
+	var helmTemplateArgs []string
 
-	manifest, err := model.HelmTemplate(t, chart, args, testCase.arguments...)
+	desiredFeatures := [][]string{
+		useNeo4jClusterName,
+		useDataModeAndAcceptLicense,
+		testCase.arguments,
+	}
+	if edition == "enterprise" {
+		desiredFeatures = append(desiredFeatures, useEnterpriseAndAcceptLicense)
+	}
+	for _, a := range desiredFeatures {
+		helmTemplateArgs = append(helmTemplateArgs, a...)
+	}
+
+	manifest, err := model.HelmTemplate(t, chart, helmTemplateArgs)
 	if !assert.NoError(t, err) {
 		return
 	}

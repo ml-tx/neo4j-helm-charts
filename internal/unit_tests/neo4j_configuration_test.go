@@ -95,7 +95,7 @@ func TestJvmAdditionalConfig(t *testing.T) {
 			return
 		}
 
-		checkNeo4jManifest(t, manifest, 0)
+		checkNeo4jManifest(t, manifest, 3)
 	}
 
 	forEachPrimaryChart(t, andEachSupportedEdition(doTestCase))
