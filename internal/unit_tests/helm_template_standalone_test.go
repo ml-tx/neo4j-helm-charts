@@ -12,12 +12,21 @@ import (
 func TestDefaultCommunityHelmTemplate(t *testing.T) {
 	t.Parallel()
 
-	manifest, err := model.HelmTemplate(t, model.Neo4jHelmChartCommunityAndEnterprise, requiredDataMode, useNeo4jStandaloneName...)
+	helmValues := model.HelmValues{
+		Neo4J: model.Neo4J{
+			Name: "test",
+		},
+		Volumes: model.Volumes{
+			Data: model.Data{
+				Mode: "selector",
+			},
+		},
+	}
+	manifest, err := model.HelmTemplateFromStruct(t, model.HelmChart, helmValues)
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Len(t, manifest.OfType(&v1.ConfigMap{}), 6)
-	assert.Len(t, manifest.OfType(&v1.Service{}), 2)
+	checkNeo4jManifest(t, manifest, 2)
 
 	neo4jStatefulSet := manifest.First(&appsv1.StatefulSet{}).(*appsv1.StatefulSet)
 	neo4jStatefulSet.GetName()
@@ -37,14 +46,13 @@ func TestDefaultCommunityHelmTemplate(t *testing.T) {
 
 func TestExplicitCommunityHelmTemplate(t *testing.T) {
 	t.Parallel()
-
-	manifest, err := model.HelmTemplate(t, model.Neo4jHelmChartCommunityAndEnterprise, requiredDataMode, append(useCommunity, useNeo4jStandaloneName...)...)
+	helmValues := model.DefaultCommunityValues
+	manifest, err := model.HelmTemplateFromStruct(t, model.HelmChart, helmValues)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	assert.Len(t, manifest.OfType(&v1.ConfigMap{}), 6)
-	assert.Len(t, manifest.OfType(&v1.Service{}), 2)
+	checkNeo4jManifest(t, manifest, 2)
 
 	neo4jStatefulSet := manifest.First(&appsv1.StatefulSet{}).(*appsv1.StatefulSet)
 	neo4jStatefulSet.GetName()

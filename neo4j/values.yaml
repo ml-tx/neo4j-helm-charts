@@ -11,8 +11,8 @@ neo4j:
   edition: "community"
 
   # Minimum number of machines initially required to form a clustered database. The StatefulSet will not reach the ready state
-  # until at least this many members have discovered each other.
-  #minimumClusterSize: 3
+  # until at least this many members have discovered each other. The default 1 (standalone)
+  #minimumClusterSize: 1
 
   # set edition: "enterprise" to use Neo4j Enterprise Edition
   #
@@ -132,18 +132,17 @@ volumes:
       name: "data"
 
 #add additional volumes and their respective mounts
-#additionalVolumes:
+additionalVolumes: []
 #  - name: neo4j1-conf
 #    emptyDir: {}
-#
-#additionalVolumeMounts:
+additionalVolumeMounts: []
 #  - mountPath: "/config/neo4j1.conf"
 #    name: neo4j1-conf
 
 
 #nodeSelector labels
 #please ensure the respective labels are present on one of the cluster nodes or else helm charts will throw an error
-nodeSelector:
+nodeSelector: {}
 #  "label1: "value1"
 #  "label2: "value2"
 
@@ -336,11 +335,11 @@ env: {}
 podSpec:
 
   #Annotations for Neo4j pod
-  annotations:
+  annotations: {}
 #   imageregistry: "https://hub.docker.com/"
 #   demo: alpha
 
-  nodeAffinity:
+  nodeAffinity: {}
 #    requiredDuringSchedulingIgnoredDuringExecution:
 #      nodeSelectorTerms:
 #        - matchExpressions:
@@ -365,7 +364,7 @@ podSpec:
   podAntiAffinity: true
 
   #Add tolerations to the Neo4j pod
-  tolerations:
+  tolerations: []
 #    - key: "key1"
 #      operator: "Equal"
 #      value: "value1"
@@ -411,7 +410,7 @@ jvm:
   # - "-XX:MaxMetaspaceSize=180m"
   # - "-XX:ReservedCodeCacheSize=40m"
 
-logs:
+logging:
   serverLogsXml: |-
 #    <?xml version="1.0" encoding="UTF-8"?>
 #    <!--

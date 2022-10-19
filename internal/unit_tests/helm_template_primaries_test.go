@@ -812,6 +812,52 @@ func TestExtraLabels(t *testing.T) {
 	}))
 }
 
+func TestClusterEnabledLabels(t *testing.T) {
+	helmValues := model.DefaultEnterpriseValues
+	helmValues.Neo4J.MinimumClusterSize = 3
+	manifest, err := model.HelmTemplateFromStruct(t, model.HelmChart, helmValues)
+	if !assert.NoError(t, err) {
+		return
+	}
+	neo4jStatefulSet := manifest.First(&appsv1.StatefulSet{}).(*appsv1.StatefulSet)
+	assert.Equal(t, neo4jStatefulSet.ObjectMeta.Labels["helm.neo4j.com/clustering"], "true")
+	assert.Equal(t, neo4jStatefulSet.Spec.Template.Labels["helm.neo4j.com/clustering"], "true")
+
+	internalsService := manifest.OfTypeWithName(
+		&v1.Service{},
+		fmt.Sprintf("%s-internals", model.DefaultHelmTemplateReleaseName.String()),
+	)
+	assert.Equal(t, internalsService.GetLabels()["helm.neo4j.com/clustering"], "true")
+}
+
+func TestClusterEnabledConfigMap(t *testing.T) {
+	clusterSize := 3
+	helmValues := model.DefaultEnterpriseValues
+	helmValues.Neo4J.MinimumClusterSize = clusterSize
+	manifest, err := model.HelmTemplateFromStruct(t, model.HelmChart, helmValues)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	defaultConfig := manifest.OfTypeWithName(
+		&v1.ConfigMap{},
+		fmt.Sprintf("%s-default-config", model.DefaultHelmTemplateReleaseName.String()),
+	).(*v1.ConfigMap)
+	assert.Equal(t, defaultConfig.Data["initial.dbms.default_primaries_count"], fmt.Sprint(clusterSize))
+	assert.Equal(t, defaultConfig.Data["dbms.cluster.minimum_initial_system_primaries_count"], fmt.Sprint(clusterSize))
+	assert.Contains(t, defaultConfig.Data, "dbms.cluster.discovery.type")
+	assert.Contains(t, defaultConfig.Data, "dbms.kubernetes.service_port_name")
+	assert.Contains(t, defaultConfig.Data, "dbms.kubernetes.service_port_name")
+	assert.Contains(t, defaultConfig.Data, "dbms.routing.default_router")
+	assert.Contains(t, defaultConfig.Data, "dbms.routing.client_side.enforce_for_domains")
+	assert.Contains(t, defaultConfig.Data, "dbms.routing.enabled")
+	assert.Contains(t, defaultConfig.Data, "server.bolt.advertised_address")
+	assert.Contains(t, defaultConfig.Data, "server.discovery.advertised_address")
+	assert.Contains(t, defaultConfig.Data, "server.cluster.raft.advertised_address")
+	assert.Contains(t, defaultConfig.Data, "server.cluster.advertised_address")
+	assert.Contains(t, defaultConfig.Data, "server.routing.advertised_address")
+}
+
 func TestEmptyImageCredentials(t *testing.T) {
 	t.Parallel()
 

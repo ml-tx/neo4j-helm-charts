@@ -101,8 +101,8 @@ func TestNeo4jPanicOnShutDownConfig(t *testing.T) {
 // TestNeo4jServerAndUserLogsConfig checks whether the server and user logs are set in the respective conf files.
 func TestNeo4jServerAndUserLogsConfig(t *testing.T) {
 	t.Parallel()
-	serverLogsXml := []string{"--set", "logs.serverLogsXml=\"unit test case to test it\""}
-	userLogsXml := []string{"--set", "logs.userLogsXml=\"unit test case to test it\""}
+	serverLogsXml := []string{"--set", "logging.serverLogsXml=\"unit test case to test it\""}
+	userLogsXml := []string{"--set", "logging.userLogsXml=\"unit test case to test it\""}
 	neo4j := model.NewReleaseName("foo")
 	desiredFeatures := [][]string{
 		useEnterprise,

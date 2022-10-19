@@ -67,18 +67,17 @@ func TestJvmAdditionalConfig(t *testing.T) {
 	t.Parallel()
 
 	doTestCase := func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		useJvmAdditionalSetting := []string{"-f", "internal/resources/testData/jvmAdditionalSettings.yaml"}
-		desiredFeatures := [][]string{
-			useJvmAdditionalSetting,
-			useEnterprise,
-			useDataModeAndAcceptLicense,
-			useNeo4jClusterName,
+		aditionalJvmArgs := []string{
+			"-XX:+HeapDumpOnOutOfMemoryError",
+			"-XX:HeapDumpPath=./java_pid<pid>.hprof",
+			"-XX:+UseGCOverheadLimit",
+			"-XX:MaxMetaspaceSize=180m",
+			"-XX:ReservedCodeCacheSize=40m",
 		}
-		var args []string
-		for _, a := range desiredFeatures {
-			args = append(args, a...)
-		}
-		manifest, err := model.HelmTemplate(t, chart, args)
+		helmValues := model.DefaultEnterpriseValues
+		helmValues.Jvm.UseNeo4JDefaultJvmArguments = true
+		helmValues.Jvm.AdditionalJvmArguments = aditionalJvmArgs
+		manifest, err := model.HelmTemplateFromStruct(t, model.HelmChart, helmValues)
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -105,18 +104,13 @@ func TestMetaspaceConfigs(t *testing.T) {
 	t.Parallel()
 
 	doTestCase := func(t *testing.T, chart model.Neo4jHelmChartBuilder, edition string) {
-		useMetaSpaceConfig := []string{"-f", "internal/resources/testData/metaspaceconfigs.yaml"}
-		desiredFeatures := [][]string{
-			useMetaSpaceConfig,
-			useEnterprise,
-			useDataModeAndAcceptLicense,
-			useNeo4jClusterName,
-		}
-		var args []string
-		for _, a := range desiredFeatures {
-			args = append(args, a...)
-		}
-		manifest, err := model.HelmTemplate(t, chart, args)
+		metaSpaceConfig := make(map[string]string)
+		metaSpaceConfig["server.memory.pagecache.size"] = "74m"
+		metaSpaceConfig["server.memory.heap.initial_size"] = "317m"
+		metaSpaceConfig["server.memory.heap.max_size"] = "317m"
+		helmValues := model.DefaultEnterpriseValues
+		helmValues.Config = metaSpaceConfig
+		manifest, err := model.HelmTemplateFromStruct(t, model.HelmChart, helmValues)
 
 		if !assert.NoError(t, err) {
 			return
