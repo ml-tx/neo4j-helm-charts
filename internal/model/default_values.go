@@ -18,6 +18,8 @@ var ImagePullSecretUsername,
 var NodeSelectorArgs, ImagePullSecretArgs, CustomApocImageArgs, PriorityClassNameArgs []string
 
 var NodeSelectorLabel = "testLabel=1"
+var DefaultNeo4jName = []string{"--set", "neo4j.name=test-cluster"}
+var DefaultClusterSize = []string{"--set", "neo4j.minimumClusterSize=3"}
 
 func init() {
 	setWorkingDir()

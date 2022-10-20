@@ -11,7 +11,7 @@ neo4j:
   edition: "community"
 
   # Minimum number of machines initially required to form a clustered database. The StatefulSet will not reach the ready state
-  # until at least this many members have discovered each other. The default 1 (standalone)
+  # until at least this many members have discovered each other. The default is 1 (standalone)
   #minimumClusterSize: 1
 
   # set edition: "enterprise" to use Neo4j Enterprise Edition
@@ -242,11 +242,11 @@ config:
 
 # securityContext defines privilege and access control settings for a Pod or Container. Making sure that we dont run Neo4j as root user.
 securityContext:
-  runAsNonRoot: true
+#  runAsNonRoot: true
   runAsUser: 7474
   runAsGroup: 7474
   fsGroup: 7474
-  fsGroupChangePolicy: "Always"
+#  fsGroupChangePolicy: "Always"
 
 # Readiness probes are set to know when a container is ready to be used.
 # Because Neo4j uses Java these values are large to distinguish between long Garbage Collection pauses (which don't require a restart) and an actual failure.

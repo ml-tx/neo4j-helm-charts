@@ -31,16 +31,19 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 	}
 
 	clusterReleaseName := model.NewReleaseName("cluster-" + TestRunIdentifier)
-	loadBalancer := clusterLoadBalancer{model.NewLoadBalancerReleaseName(clusterReleaseName), nil}
 	headlessService := clusterHeadLessService{model.NewHeadlessServiceReleaseName(clusterReleaseName), nil}
-	readReplica1 := clusterReadReplica{model.NewReadReplicaReleaseName(clusterReleaseName, 1), model.ImagePullSecretArgs}
-	readReplica2 := clusterReadReplica{model.NewReadReplicaReleaseName(clusterReleaseName, 2), nil}
-
-	core1 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 1), append(model.ImagePullSecretArgs, model.NodeSelectorArgs...)}
-	core2 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 2), model.PriorityClassNameArgs}
-	core3 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 3), nil}
+	//defaultHelmArgs := []string{"--set", "volumes.data.volume.setOwnerAndGroupWritableFilePermissions=true",
+	//	"--set", "volumes.logs.volume.setOwnerAndGroupWritableFilePermissions=true"}
+	defaultHelmArgs := []string{}
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultNeo4jName...)
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultClusterSize...)
+	core1HelmArgs := append(defaultHelmArgs, model.ImagePullSecretArgs...)
+	core1HelmArgs = append(core1HelmArgs, model.NodeSelectorArgs...)
+	core2HelmArgs := append(defaultHelmArgs, model.PriorityClassNameArgs...)
+	core1 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 1), core1HelmArgs}
+	core2 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 2), core2HelmArgs}
+	core3 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 3), defaultHelmArgs}
 	cores := []clusterCore{core1, core2, core3}
-	readReplicas := []clusterReadReplica{readReplica1, readReplica2}
 
 	t.Cleanup(func() { cleanupTest(t, AsCloseable(closeables)) })
 
@@ -63,7 +66,7 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 		return
 	}
 
-	componentsToParallelInstall := []helmComponent{core2, core3, loadBalancer, headlessService}
+	componentsToParallelInstall := []helmComponent{core2, core3, headlessService}
 	closeablesNew, err := performBackgroundInstall(t, componentsToParallelInstall, clusterReleaseName)
 	if !assert.NoError(t, err) {
 		return
@@ -76,31 +79,21 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 			return
 		}
 	}
-	//install read replicas after cores are completed and cluster is formed or else the read replica installation will fail
-	componentsToParallelInstall = []helmComponent{readReplica1, readReplica2}
 	closeablesNew, err = performBackgroundInstall(t, componentsToParallelInstall, clusterReleaseName)
 	if !assert.NoError(t, err) {
 		return
 	}
 	addCloseable(closeablesNew...)
 
-	for _, readReplica := range readReplicas {
-		err = run(t, "kubectl", "--namespace", string(readReplica.Name().Namespace()), "rollout", "status", "--watch", "--timeout=180s", "statefulset/"+readReplica.Name().String())
-		if !assert.NoError(t, err) {
-			return
-		}
-	}
-
 	t.Logf("Succeeded with setup of '%s'", t.Name())
 
-	subTests, err := clusterTests(loadBalancer.Name())
-	if !assert.NoError(t, err) {
-		return
-	}
-	subTests = append(subTests, nodeSelectorTests(core1.Name())...)
-	subTests = append(subTests, headLessServiceTests(headlessService.Name())...)
-	subTests = append(subTests, readReplicaTests(readReplica1.Name(), readReplica2.Name(), loadBalancer.Name())...)
-	runSubTests(t, subTests)
+	//subTests, err := clusterTests(loadBalancer.Name())
+	//if !assert.NoError(t, err) {
+	//	return
+	//}
+	//subTests = append(subTests, nodeSelectorTests(core1.Name())...)
+	//subTests = append(subTests, headLessServiceTests(headlessService.Name())...)
+	//runSubTests(t, subTests)
 
 	t.Logf("Succeeded running all tests in '%s'", t.Name())
 }
