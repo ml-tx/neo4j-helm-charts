@@ -59,19 +59,13 @@ func removeLabelFromNodes(t *testing.T) error {
 
 // clusterTests contains all the tests related to cluster
 func clusterTests(loadBalancerName model.ReleaseName) ([]SubTest, error) {
-	expectedConfiguration, err := (&model.Neo4jConfiguration{}).PopulateFromFile(Neo4jConfFile)
-	if err != nil {
-		return nil, err
-	}
-	expectedConfiguration = addExpectedClusterConfiguration(expectedConfiguration)
 
 	subTests := []SubTest{
 
-		//TODO: This is to be enabled in 5.0
-		//{name: "Check Cluster Core Logs Format", test: func(t *testing.T) {
-		//	t.Parallel()
-		//	assert.NoError(t, CheckLogsFormat(t, core), "Cluster core logs format should be in JSON")
-		//}},
+		{name: "Check Cluster Core Logs Format", test: func(t *testing.T) {
+			t.Parallel()
+			assert.NoError(t, CheckLogsFormat(t, loadBalancerName), "Cluster core logs format should be in JSON")
+		}},
 		{name: "ImagePullSecret tests", test: func(t *testing.T) {
 			t.Parallel()
 			assert.NoError(t, imagePullSecretTests(t, loadBalancerName), "Perform ImagePullSecret Tests")
@@ -100,23 +94,21 @@ func clusterTests(loadBalancerName model.ReleaseName) ([]SubTest, error) {
 	return subTests, nil
 }
 
-//TODO: This is to be enabled in 5.0
-//CheckLogsFormat checks whether the neo4j logs are in json format or not
-// we check for the json "level":"INFO","message":"Started."} in /logs/neo4j.log
-//func CheckLogsFormat(t *testing.T, releaseName model.ReleaseName) error {
-//
-//	stdout, stderr, err := ExecInPod(releaseName, []string{"cat", "/logs/neo4j.log"})
-//	if !assert.NoError(t, err) {
-//		return fmt.Errorf("error seen while executing command `cat /logs/neo4j.log' ,\n err :- %v", err)
-//	}
-//	if !assert.Contains(t, stdout, ",\"level\":\"INFO\",\"message\":\"Started.\"}") {
-//		return fmt.Errorf("foes not contain the required json format\n stdout := %s", stdout)
-//	}
-//	if !assert.Len(t, stderr, 0) {
-//		return fmt.Errorf("stderr found while checking logs \n stderr := %s", stderr)
-//	}
-//	return nil
-//}
+// CheckLogsFormat checks whether the neo4j logs are in json format or not
+func CheckLogsFormat(t *testing.T, releaseName model.ReleaseName) error {
+
+	stdout, stderr, err := ExecInPod(releaseName, []string{"cat", "/logs/neo4j.log"})
+	if !assert.NoError(t, err) {
+		return fmt.Errorf("error seen while executing command `cat /logs/neo4j.log' ,\n err :- %v", err)
+	}
+	if !assert.Contains(t, stdout, ",\"level\":\"INFO\",\"category\":\"c.n.s.e.EnterpriseBootstrapper\",\"message\":\"Command expansion is explicitly enabled for configuration\"}") {
+		return fmt.Errorf("foes not contain the required json format\n stdout := %s", stdout)
+	}
+	if !assert.Len(t, stderr, 0) {
+		return fmt.Errorf("stderr found while checking logs \n stderr := %s", stderr)
+	}
+	return nil
+}
 
 // imagePullSecretTests runs tests related to imagePullSecret feature
 func imagePullSecretTests(t *testing.T, name model.ReleaseName) error {
@@ -244,51 +236,6 @@ func apocConfigTests(releaseName model.ReleaseName) []SubTest {
 	}
 }
 
-// readReplicaTests contains all the tests related to read replicas
-func readReplicaTests(readReplica1Name model.ReleaseName, readReplica2Name model.ReleaseName, loadBalancerName model.ReleaseName) []SubTest {
-	return []SubTest{
-		//TODO: This is to be enabled in 5.0
-		//{name: "Check ReadReplica Logs Format", test: func(t *testing.T) {
-		//	t.Parallel()
-		//	assert.NoError(t, CheckLogsFormat(t, readReplica1Name), "Read Replica logs format should be in JSON")
-		//}},
-		//{name: "Check Read Replica Logs Format", test: func(t *testing.T) {
-		//	t.Parallel()
-		//	assert.NoError(t, CheckLogsFormat(t, readReplica1Name), "Checks Read Replica Logs Format")
-		//}},
-		{name: "Check Read Replica Configuration", test: func(t *testing.T) {
-			t.Parallel()
-			assert.NoError(t, checkReadReplicaConfiguration(t, readReplica1Name), "Checks Read Replica Configuration")
-		}},
-		{name: "Check ReadReplica2 Neo4j Logs For Any Errors", test: func(t *testing.T) {
-			t.Parallel()
-			assert.NoError(t, checkNeo4jLogsForAnyErrors(t, readReplica2Name), "Neo4j Logs check should succeed")
-		}},
-		{name: "Check Read Replica Server Groups", test: func(t *testing.T) {
-			t.Parallel()
-			assert.NoError(t, checkReadReplicaServerGroupsConfiguration(t, readReplica1Name), "Checks Read Replica Server Groups config contains read-replicas or not")
-		}},
-		{name: "Update Read Replica With Upstream Strategy on Read Replica 2", test: func(t *testing.T) {
-			assert.NoError(t, updateReadReplicaConfig(t, readReplica2Name, resources.ReadReplicaUpstreamStrategy.HelmArgs()...), "Adds upstream strategy on read replica")
-		}},
-		{name: "Create Node on Read Replica 1", test: func(t *testing.T) {
-			assert.NoError(t, createNodeOnReadReplica(t, readReplica1Name), "Create Node on read replica should be redirected to the cluster code")
-		}},
-		{name: "Count Nodes on Read Replica 1", test: func(t *testing.T) {
-			assert.NoError(t, checkNodeCountOnReadReplica(t, readReplica1Name, 2), "Count Nodes on read replica should succeed")
-		}},
-		{name: "Count Nodes on Read Replica 2 Via Upstream Strategy", test: func(t *testing.T) {
-			assert.NoError(t, checkNodeCountOnReadReplica(t, readReplica2Name, 2), "Count Nodes on read replica2 should succeed by fetching it from read replica 1")
-		}},
-		{name: "Update Read Replica 2 to exclude from load balancer", test: func(t *testing.T) {
-			assert.NoError(t, updateReadReplicaConfig(t, readReplica2Name, resources.ExcludeLoadBalancer.HelmArgs()...), "Performs helm upgrade on read replica 2 to exclude it from loadbalancer")
-		}},
-		{name: "Check Load Balancer Exclusion Property", test: func(t *testing.T) {
-			assert.NoError(t, checkLoadBalancerExclusion(t, readReplica2Name, loadBalancerName), "LoadBalancer Exclusion Test should succeed")
-		}},
-	}
-}
-
 // checkClusterCorePasswordFailure checks if a cluster core is failing on installation or not with an incorrect password
 func checkClusterCorePasswordFailure(t *testing.T) error {
 	//creating a sample cluster core definition (which is not supposed to get installed)
@@ -306,7 +253,7 @@ func checkClusterCorePasswordFailure(t *testing.T) error {
 			model.HelmChart,
 			model.Neo4jEdition,
 			&diskName,
-			"--set", "neo4j.password=my-password")...).CombinedOutput()
+			"--set", "neo4j.password=my-password", "--set", "neo4j.name="+model.DefaultNeo4jName)...).CombinedOutput()
 	if !assert.Error(t, err) {
 		return fmt.Errorf("helm install should fail without the default password")
 	}
@@ -370,7 +317,7 @@ func checkK8s(t *testing.T, name model.ReleaseName) error {
 	})
 	t.Run("check lb", func(t *testing.T) {
 		t.Parallel()
-		assert.NoError(t, checkLoadBalancerService(t, name, 5))
+		assert.NoError(t, checkLoadBalancerService(t, name, model.DefaultClusterSize))
 	})
 	return nil
 }
@@ -379,10 +326,10 @@ func checkK8s(t *testing.T, name model.ReleaseName) error {
 // It also checks that the number of endpoints should match with the given number of expected endpoints
 func checkLoadBalancerService(t *testing.T, name model.ReleaseName, expectedEndPoints int) error {
 
-	serviceName := fmt.Sprintf("%s-neo4j", name.String())
+	serviceName := fmt.Sprintf("%s-lb-neo4j", model.DefaultNeo4jName)
 	lbService, err := Clientset.CoreV1().Services(string(name.Namespace())).Get(context.TODO(), serviceName, metav1.GetOptions{})
 	if !assert.NoError(t, err) {
-		return fmt.Errorf("loadbalancer service %s not found , Error seen := %v", name.String(), err)
+		return fmt.Errorf("loadbalancer service %s not found , Error seen := %v", serviceName, err)
 	}
 
 	lbEndpoints, err := Clientset.CoreV1().Endpoints(string(name.Namespace())).Get(context.TODO(), lbService.Name, metav1.GetOptions{})
@@ -405,14 +352,13 @@ func checkPods(t *testing.T, name model.ReleaseName) error {
 		return err
 	}
 
-	//5 = 3 cores + 2 read replica
-	if !assert.Len(t, pods.Items, 5) {
-		return fmt.Errorf("number of pods should be 5")
+	if !assert.Len(t, pods.Items, model.DefaultClusterSize) {
+		return fmt.Errorf("number of pods should be %d", model.DefaultClusterSize)
 	}
 	for _, pod := range pods.Items {
 		if assert.Contains(t, pod.Labels, "app") {
-			if !assert.Equal(t, "neo4j-cluster", pod.Labels["app"]) {
-				return fmt.Errorf("pod should have label app=neo4jcluster , found app=%s", pod.Labels["app"])
+			if !assert.Equal(t, model.DefaultNeo4jName, pod.Labels["app"]) {
+				return fmt.Errorf("pod should have label app=%s , found app=%s", model.DefaultNeo4jName, pod.Labels["app"])
 			}
 		}
 	}

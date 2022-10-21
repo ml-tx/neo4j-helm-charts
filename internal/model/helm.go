@@ -105,7 +105,8 @@ func BaseHelmCommand(helmCommand string, releaseName ReleaseName, chart Neo4jHel
 	var helmArgs = minHelmCommand(helmCommand, releaseName, chart)
 	helmArgs = append(helmArgs,
 		"--set", "volumes.data.mode=volume",
-		"--set", "volumes.data.volume.persistentVolumeClaim.claimName="+fmt.Sprintf("%s-pvc", *diskName),
+		"--set", "volumes.data.volume.persistentVolumeClaim.claimName="+fmt.Sprintf("%s-pvc", releaseName.String()),
+		//"--set", "volumes.data.volume.gcePersistentDisk.pdName="+string(*diskName),
 		"--set", "neo4j.password="+DefaultPassword,
 		"--set", "neo4j.resources.requests.cpu="+cpuRequests,
 		"--set", "neo4j.resources.requests.memory="+memoryRequests,
@@ -115,6 +116,7 @@ func BaseHelmCommand(helmCommand string, releaseName ReleaseName, chart Neo4jHel
 		"--set", "ssl.bolt.trustedCerts.sources[0].secret.name=bolt-cert",
 		"--set", "ssl.https.privateKey.secretName=https-key", "--set", "ssl.https.publicCertificate.secretName=https-cert",
 		"--set", "ssl.https.trustedCerts.sources[0].secret.name=https-cert",
+		"-f", resources.JsonLogging.Path(),
 	)
 
 	if value, found := os.LookupEnv("NEO4J_DOCKER_IMG"); found {

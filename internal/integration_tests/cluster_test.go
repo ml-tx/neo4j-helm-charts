@@ -1,7 +1,9 @@
 package integration_tests
 
 import (
+	"fmt"
 	. "github.com/neo4j/helm-charts/internal/helpers"
+	"github.com/neo4j/helm-charts/internal/integration_tests/gcloud"
 	"github.com/neo4j/helm-charts/internal/model"
 	"github.com/neo4j/helm-charts/internal/resources"
 	"github.com/stretchr/testify/assert"
@@ -35,8 +37,8 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 	//defaultHelmArgs := []string{"--set", "volumes.data.volume.setOwnerAndGroupWritableFilePermissions=true",
 	//	"--set", "volumes.logs.volume.setOwnerAndGroupWritableFilePermissions=true"}
 	defaultHelmArgs := []string{}
-	defaultHelmArgs = append(defaultHelmArgs, model.DefaultNeo4jName...)
-	defaultHelmArgs = append(defaultHelmArgs, model.DefaultClusterSize...)
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultNeo4jNameArg...)
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultClusterSizeArg...)
 	core1HelmArgs := append(defaultHelmArgs, model.ImagePullSecretArgs...)
 	core1HelmArgs = append(core1HelmArgs, model.NodeSelectorArgs...)
 	core2HelmArgs := append(defaultHelmArgs, model.PriorityClassNameArgs...)
@@ -45,7 +47,32 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 	core3 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 3), defaultHelmArgs}
 	cores := []clusterCore{core1, core2, core3}
 
-	t.Cleanup(func() { cleanupTest(t, AsCloseable(closeables)) })
+	//t.Cleanup(func() { cleanupTest(t, AsCloseable(closeables)) })
+	t.Cleanup(func() {
+		runAll(t, "helm", [][]string{
+			{"uninstall", core1.name.String(), "--wait", "--timeout", "1m", "--namespace", string(clusterReleaseName.Namespace())},
+			{"uninstall", core2.name.String(), "--wait", "--timeout", "1m", "--namespace", string(clusterReleaseName.Namespace())},
+			{"uninstall", core3.name.String(), "--wait", "--timeout", "1m", "--namespace", string(clusterReleaseName.Namespace())},
+			{"uninstall", clusterReleaseName.String() + "-headless", "--wait", "--timeout", "1m", "--namespace", string(clusterReleaseName.Namespace())},
+		}, false)
+		runAll(t, "kubectl", [][]string{
+			{"delete", "pvc", fmt.Sprintf("%s-pvc", core1.name.String()), "--namespace", string(clusterReleaseName.Namespace()), "--ignore-not-found"},
+			{"delete", "pvc", fmt.Sprintf("%s-pvc", core2.name.String()), "--namespace", string(clusterReleaseName.Namespace()), "--ignore-not-found"},
+			{"delete", "pvc", fmt.Sprintf("%s-pvc", core3.name.String()), "--namespace", string(clusterReleaseName.Namespace()), "--ignore-not-found"},
+			{"delete", "pv", fmt.Sprintf("%s-pv", core1.name.String()), "--ignore-not-found"},
+			{"delete", "pv", fmt.Sprintf("%s-pv", core2.name.String()), "--ignore-not-found"},
+			{"delete", "pv", fmt.Sprintf("%s-pv", core3.name.String()), "--ignore-not-found"},
+		}, false)
+		runAll(t, "gcloud", [][]string{
+			{"compute", "disks", "delete", fmt.Sprintf("neo4j-data-disk-%s", core1.name), "--zone=" + string(gcloud.CurrentZone()), "--project=" + string(gcloud.CurrentProject())},
+			{"compute", "disks", "delete", fmt.Sprintf("neo4j-data-disk-%s", core2.name), "--zone=" + string(gcloud.CurrentZone()), "--project=" + string(gcloud.CurrentProject())},
+			{"compute", "disks", "delete", fmt.Sprintf("neo4j-data-disk-%s", core3.name), "--zone=" + string(gcloud.CurrentZone()), "--project=" + string(gcloud.CurrentProject())},
+		}, false)
+		runAll(t, "kubectl", [][]string{
+			{"delete", "namespace", string(clusterReleaseName.Namespace()), "--ignore-not-found", "--force", "--grace-period=0"},
+			{"delete", "priorityClass", "high-priority", "--force", "--grace-period=0"},
+		}, false)
+	})
 
 	t.Logf("Starting setup of '%s'", t.Name())
 
@@ -79,21 +106,17 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 			return
 		}
 	}
-	closeablesNew, err = performBackgroundInstall(t, componentsToParallelInstall, clusterReleaseName)
-	if !assert.NoError(t, err) {
-		return
-	}
 	addCloseable(closeablesNew...)
 
 	t.Logf("Succeeded with setup of '%s'", t.Name())
 
-	//subTests, err := clusterTests(loadBalancer.Name())
-	//if !assert.NoError(t, err) {
-	//	return
-	//}
+	subTests, err := clusterTests(core1.Name())
+	if !assert.NoError(t, err) {
+		return
+	}
 	//subTests = append(subTests, nodeSelectorTests(core1.Name())...)
 	//subTests = append(subTests, headLessServiceTests(headlessService.Name())...)
-	//runSubTests(t, subTests)
+	runSubTests(t, subTests)
 
 	t.Logf("Succeeded running all tests in '%s'", t.Name())
 }

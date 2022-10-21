@@ -14,8 +14,10 @@ func TestInstallStandaloneOnGCloudK8s(t *testing.T) {
 
 	t.Parallel()
 	t.Logf("Starting setup of '%s'", t.Name())
-
-	cleanup, err := installNeo4j(t, releaseName, chart, resources.TestAntiAffinityRule.HelmArgs()...)
+	defaultHelmArgs := []string{}
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultNeo4jNameArg...)
+	defaultHelmArgs = append(defaultHelmArgs, resources.TestAntiAffinityRule.HelmArgs()...)
+	cleanup, err := installNeo4j(t, releaseName, chart, defaultHelmArgs...)
 	t.Cleanup(func() { cleanupTest(t, cleanup) })
 
 	if !assert.NoError(t, err) {
