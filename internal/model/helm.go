@@ -100,7 +100,7 @@ func minHelmCommand(helmCommand string, releaseName ReleaseName, chart HelmChart
 	return []string{helmCommand, releaseName.String(), chart.getPath(), "--namespace", string(releaseName.Namespace())}
 }
 
-func BaseHelmCommand(helmCommand string, releaseName ReleaseName, chart Neo4jHelmChartBuilder, edition string, diskName *PersistentDiskName, extraHelmArguments ...string) []string {
+func BaseHelmCommand(helmCommand string, releaseName ReleaseName, chart Neo4jHelmChartBuilder, edition string, extraHelmArguments ...string) []string {
 
 	var helmArgs = minHelmCommand(helmCommand, releaseName, chart)
 	helmArgs = append(helmArgs,

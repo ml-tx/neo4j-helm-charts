@@ -242,18 +242,11 @@ func checkClusterCorePasswordFailure(t *testing.T) error {
 	clusterReleaseName := model.NewReleaseName("cluster-" + TestRunIdentifier)
 	core := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 4), nil}
 	releaseName := core.Name()
-	diskName := releaseName.DiskName()
 	// we are not using the customized run() func here since we need to assert the error received on stdout
 	//(present in out variable and not in err)
 	out, err := exec.Command(
 		"helm",
-		model.BaseHelmCommand(
-			"install",
-			releaseName,
-			model.HelmChart,
-			model.Neo4jEdition,
-			&diskName,
-			"--set", "neo4j.password=my-password", "--set", "neo4j.name="+model.DefaultNeo4jName)...).CombinedOutput()
+		model.BaseHelmCommand("install", releaseName, model.HelmChart, model.Neo4jEdition, "--set", "neo4j.password=my-password", "--set", "neo4j.name="+model.DefaultNeo4jName)...).CombinedOutput()
 	if !assert.Error(t, err) {
 		return fmt.Errorf("helm install should fail without the default password")
 	}
@@ -374,7 +367,7 @@ func checkNeo4jLogsForAnyErrors(t *testing.T, name model.ReleaseName) error {
 		"cat /logs/neo4j.log /logs/debug.log",
 	}
 
-	_, stderr, err := ExecInPod(name, cmd)
+	stdout, stderr, err := ExecInPod(name, cmd)
 	if !assert.NoError(t, err) {
 		return err
 	}
@@ -384,9 +377,9 @@ func checkNeo4jLogsForAnyErrors(t *testing.T, name model.ReleaseName) error {
 	//commenting this one out, the issue is reported to kernel team (card created)
 	//https://trello.com/c/z0g4J7om/7548-neo4j-447-startup-error-seen-in-community-edition
 	// Should be uncommented or removed based on the findings in the above card
-	//if !assert.NotContains(t, stdout, " ERROR [") {
-	//	return fmt.Errorf("Contains error logs \n%s", stdout)
-	//}
+	if !assert.NotContains(t, stdout, " ERROR [") {
+		return fmt.Errorf("Contains error logs \n%s", stdout)
+	}
 	return nil
 }
 

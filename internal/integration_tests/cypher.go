@@ -29,11 +29,11 @@ func checkNeo4jConfiguration(t *testing.T, releaseName model.ReleaseName, expect
 
 	var runtimeConfig []*neo4j.Record
 	var expectedOverrides = map[string]string{
-		"dbms.connector.https.enabled":   "true",
-		"dbms.connector.bolt.tls_level":  "REQUIRED",
-		"dbms.directories.logs":          "/logs",
-		"dbms.directories.metrics":       "/metrics",
-		"dbms.directories.import":        "/import",
+		"server.https.enabled":           "true",
+		"server.bolt.tls_level":          "REQUIRED",
+		"server.directories.logs":        "/logs",
+		"server.directories.metrics":     "/metrics",
+		"server.directories.import":      "/import",
 		"server.panic.shutdown_on_panic": "true",
 	}
 
@@ -69,7 +69,7 @@ func checkNeo4jConfiguration(t *testing.T, releaseName model.ReleaseName, expect
 			assert.Equal(t, strings.ToLower(expectedValue), strings.ToLower(value),
 				"Expected runtime config for %s to match provided value", name)
 		}
-		if name == "dbms.jvm.additional" {
+		if name == "server.jvm.additional" {
 			assert.Equal(t, expectedConfiguration.JvmArgs(), strings.Split(value, "\n"))
 		}
 	}
@@ -245,18 +245,10 @@ func checkNodeCount(t *testing.T, releaseName model.ReleaseName) error {
 // updateReadReplicaConfig updates the read replica upstream strategy on the provided chart
 func updateReadReplicaConfig(t *testing.T, releaseName model.ReleaseName, extraArgs ...string) error {
 
-	diskName := releaseName.DiskName()
 	err := run(
 		t,
 		"helm",
-		model.BaseHelmCommand(
-			"upgrade",
-			releaseName,
-			model.ClusterReadReplicaHelmChart,
-			model.Neo4jEdition,
-			&diskName,
-			append(extraArgs, "--wait", "--timeout", "300s")...,
-		)...,
+		model.BaseHelmCommand("upgrade", releaseName, model.ClusterReadReplicaHelmChart, model.Neo4jEdition, append(extraArgs, "--wait", "--timeout", "300s")...)...,
 	)
 	if !assert.NoError(t, err) {
 		return err

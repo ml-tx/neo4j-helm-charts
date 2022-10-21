@@ -329,20 +329,19 @@ func InstallNeo4jInGcloud(t *testing.T, zone gcloud.Zone, project gcloud.Project
 	if err != nil {
 		return AsCloseable(closeables), err
 	}
-
-	addCloseable(func() error { return runAll(t, "helm", helmCleanupCommands(releaseName), false) })
+	addCloseable(cleanupGcloud)
 	// delete the statefulset like this otherwise the pods will hang around for their termination grace period
 	addCloseable(func() error {
 		return runAll(t, "kubectl", [][]string{
 			{"delete", "statefulset", releaseName.String(), "--namespace", string(releaseName.Namespace()), "--grace-period=0", "--force", "--ignore-not-found"},
 			{"delete", "pod", releaseName.PodName(), "--namespace", string(releaseName.Namespace()), "--grace-period=0", "--wait", "--timeout=120s", "--ignore-not-found"},
-			//{"delete", "pvc", fmt.Sprintf("%s-pvc", string(*diskName)), "--grace-period=0", "--wait", "--timeout=120s", "--ignore-not-found"},
-			//{"delete", "pv", fmt.Sprintf("%s-pv", string(*diskName)), "--grace-period=0", "--wait", "--timeout=120s", "--ignore-not-found"},
+			{"delete", "pvc", fmt.Sprintf("%s-pvc", releaseName.String()), "--grace-period=0", "--wait", "--timeout=120s", "--ignore-not-found"},
+			{"delete", "pv", fmt.Sprintf("%s-pv", releaseName.String()), "--grace-period=0", "--wait", "--timeout=10s", "--ignore-not-found"},
 		}, false)
 	})
-	addCloseable(cleanupGcloud)
+	addCloseable(func() error { return runAll(t, "helm", helmCleanupCommands(releaseName), false) })
 
-	err = run(t, "helm", model.BaseHelmCommand("install", releaseName, chart, model.Neo4jEdition, diskName, extraHelmInstallArgs...)...)
+	err = run(t, "helm", model.BaseHelmCommand("install", releaseName, chart, model.Neo4jEdition, extraHelmInstallArgs...)...)
 
 	if err != nil {
 		return AsCloseable(closeables), err
@@ -370,6 +369,7 @@ func createPersistentVolume(name *model.PersistentDiskName, zone gcloud.Zone, pr
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			//PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 			ClaimRef: &v1.ObjectReference{
 				Kind:       "PersistentVolumeClaim",
 				Namespace:  string(release.Namespace()),
@@ -392,9 +392,6 @@ func createPersistentVolume(name *model.PersistentDiskName, zone gcloud.Zone, pr
 			},
 			VolumeName:       pv.Name,
 			StorageClassName: &pv.Spec.StorageClassName,
-			VolumeMode:       nil,
-			DataSource:       nil,
-			DataSourceRef:    nil,
 		},
 	}
 	_, err := Clientset.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
