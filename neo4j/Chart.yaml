@@ -1,8 +1,8 @@
 apiVersion: v1
 name: neo4j
 home: https://www.neo4j.com
-version: 5.0.0
-appVersion: eu.gcr.io/neo4j-helm/neo4j:v5
+version: 5.1.0
+appVersion: 5.1.0
 description: Neo4j is the world's leading graph database
 keywords:
   - graph

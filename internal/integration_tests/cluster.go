@@ -6,9 +6,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	. "github.com/neo4j/helm-charts/internal/helpers"
 	"github.com/neo4j/helm-charts/internal/model"
-	"github.com/neo4j/helm-charts/internal/resources"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"os/exec"
@@ -256,53 +254,6 @@ func checkClusterCorePasswordFailure(t *testing.T) error {
 	return nil
 }
 
-//checkLoadBalancerExclusion updates the label on the provided read replica to excluded it from loadbalancer
-/*We check for two things : the loadbalancer count should be 4 (3 cores + 1 rr) and the loadbalancer endpoints list should not
-  contain the given read replica pod ip*/
-func checkLoadBalancerExclusion(t *testing.T, readReplicaName model.ReleaseName, loadBalancerName model.ReleaseName) error {
-
-	//updating the read replica to exclude itself from loadbalancer
-	if !assert.NoError(t, updateReadReplicaConfig(t, readReplicaName, resources.ExcludeLoadBalancer.HelmArgs()...)) {
-		return fmt.Errorf("error seen while updating read replica config")
-	}
-
-	serviceName := fmt.Sprintf("%s-neo4j", loadBalancerName.String())
-	lbService, err := Clientset.CoreV1().Services(string(loadBalancerName.Namespace())).Get(context.TODO(), serviceName, metav1.GetOptions{})
-	if !assert.NoError(t, err) {
-		return fmt.Errorf("loadbalancer service %s not found , Error seen := %v", loadBalancerName.String(), err)
-	}
-
-	manifest, err := getManifest(loadBalancerName.Namespace())
-	if !assert.NoError(t, err) {
-		return err
-	}
-
-	if !assert.NotNil(t, lbService) {
-		return fmt.Errorf("loadbalancer service not found")
-	}
-
-	readReplicaPod := manifest.OfTypeWithName(&v1.Pod{}, readReplicaName.PodName()).(*v1.Pod)
-	lbEndpoints := manifest.OfTypeWithName(&v1.Endpoints{}, lbService.Name).(*v1.Endpoints)
-
-	if !assert.NotNil(t, readReplicaPod) {
-		return fmt.Errorf("readReplicaPod with name %s should exist", readReplicaName.PodName())
-	}
-	if !assert.NotNil(t, lbEndpoints) {
-		return fmt.Errorf("loadbalancer endpoints should not be empty")
-	}
-	if !assert.Len(t, lbEndpoints.Subsets, 1) {
-		return fmt.Errorf("subsets length should be equal to 1")
-	}
-	if !assert.Len(t, lbEndpoints.Subsets[0].Addresses, 4) {
-		return fmt.Errorf("number of endpoints should be 4")
-	}
-	if !assert.NotContains(t, lbEndpoints.Subsets[0].Addresses, readReplicaPod.Status.PodIP) {
-		return fmt.Errorf("loadbalancer endpoints should not contains the readreplica podIP")
-	}
-
-	return nil
-}
-
 func checkK8s(t *testing.T, name model.ReleaseName) error {
 	t.Run("check pods", func(t *testing.T) {
 		t.Parallel()
@@ -386,7 +337,7 @@ func checkNeo4jLogsForAnyErrors(t *testing.T, name model.ReleaseName) error {
 // checkHeadlessServiceConfiguration checks whether the provided service is headless service or not
 func checkHeadlessServiceConfiguration(t *testing.T, service model.ReleaseName) error {
 
-	serviceName := fmt.Sprintf("%s-neo4j", service.String())
+	serviceName := fmt.Sprintf("%s-headless", model.DefaultNeo4jName)
 	headlessService, err := Clientset.CoreV1().Services(string(service.Namespace())).Get(context.TODO(), serviceName, metav1.GetOptions{})
 	if !assert.NoError(t, err) {
 		return fmt.Errorf("headless service %s not found , Error seen := %v", service.String(), err)
@@ -406,7 +357,7 @@ func checkHeadlessServiceConfiguration(t *testing.T, service model.ReleaseName) 
 // By default , headless service includes cluster core only and no read replicas
 func checkHeadlessServiceEndpoints(t *testing.T, service model.ReleaseName) error {
 
-	serviceName := fmt.Sprintf("%s-neo4j", service.String())
+	serviceName := fmt.Sprintf("%s-headless", model.DefaultNeo4jName)
 
 	//get the endpoints associated with the headless service
 	endpoints, err := Clientset.CoreV1().Endpoints(string(service.Namespace())).Get(context.TODO(), serviceName, metav1.GetOptions{})
@@ -461,18 +412,6 @@ func checkHeadlessServiceEndpoints(t *testing.T, service model.ReleaseName) erro
 	}
 
 	return nil
-}
-
-func addExpectedClusterConfiguration(configuration *model.Neo4jConfiguration) *model.Neo4jConfiguration {
-	updatedConfig := configuration.UpdateFromMap(map[string]string{
-		"dbms.mode":                                      "CORE",
-		"causal_clustering.discovery_type":               "K8S",
-		"causal_clustering.kubernetes.service_port_name": "tcp-discovery",
-		"causal_clustering.kubernetes.label_selector":    "app=neo4j-cluster,helm.neo4j.com/service=internals,helm.neo4j.com/dbms.mode=CORE",
-		"dbms.routing.default_router":                    "SERVER",
-		"dbms.routing.enabled":                           "true",
-	}, true)
-	return &updatedConfig
 }
 
 func performBackgroundInstall(t *testing.T, componentsToParallelInstall []helmComponent, clusterReleaseName model.ReleaseName) ([]Closeable, error) {

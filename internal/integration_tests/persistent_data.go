@@ -17,7 +17,7 @@ func ResourcesReinstall(t *testing.T, releaseName model.ReleaseName, chart model
 	err := run(t, "helm", model.BaseHelmCommand("install", releaseName, chart, model.Neo4jEdition, defaultHelmArgs...)...)
 	if err != nil {
 		t.Log("Helm Install failed:", err)
-		run(t, "kubectl", "get", "events")
+		_ = run(t, "kubectl", "get", "events")
 		return err
 	}
 	err = run(t, "kubectl", "--namespace", string(releaseName.Namespace()), "rollout", "status", "--watch", "--timeout=120s", "statefulset/"+releaseName.String())

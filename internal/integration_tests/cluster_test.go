@@ -33,11 +33,9 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 	}
 
 	clusterReleaseName := model.NewReleaseName("cluster-" + TestRunIdentifier)
-	headlessService := clusterHeadLessService{model.NewHeadlessServiceReleaseName(clusterReleaseName), nil}
-	//defaultHelmArgs := []string{"--set", "volumes.data.volume.setOwnerAndGroupWritableFilePermissions=true",
-	//	"--set", "volumes.logs.volume.setOwnerAndGroupWritableFilePermissions=true"}
 	defaultHelmArgs := []string{}
 	defaultHelmArgs = append(defaultHelmArgs, model.DefaultNeo4jNameArg...)
+	headlessService := clusterHeadLessService{model.NewHeadlessServiceReleaseName(clusterReleaseName), defaultHelmArgs}
 	defaultHelmArgs = append(defaultHelmArgs, model.DefaultClusterSizeArg...)
 	core1HelmArgs := append(defaultHelmArgs, model.ImagePullSecretArgs...)
 	core1HelmArgs = append(core1HelmArgs, model.NodeSelectorArgs...)
@@ -90,11 +88,81 @@ func TestInstallNeo4jClusterInGcloud(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	//subTests = append(subTests, nodeSelectorTests(core1.Name())...)
-	//subTests = append(subTests, headLessServiceTests(headlessService.Name())...)
+	subTests = append(subTests, nodeSelectorTests(core1.Name())...)
+	subTests = append(subTests, headLessServiceTests(headlessService.Name())...)
 	runSubTests(t, subTests)
 
 	t.Logf("Succeeded running all tests in '%s'", t.Name())
+}
+
+func TestInstallNeo4jClusterWithApocConfigInGcloud(t *testing.T) {
+	if model.Neo4jEdition != "enterprise" {
+		t.Skip()
+		return
+	}
+
+	//if we make this in parallel with the other cluster tests , it will fail
+	// we need to wait for this cluster test to complete so that the other cluster test can complete
+	//t.Parallel()
+
+	var closeables []Closeable
+	addCloseable := func(closeableList ...Closeable) {
+		for _, closeable := range closeableList {
+			closeables = append([]Closeable{closeable}, closeables...)
+		}
+	}
+
+	clusterReleaseName := model.NewReleaseName("apoc-cluster-" + TestRunIdentifier)
+	defaultHelmArgs := []string{}
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultNeo4jNameArg...)
+	defaultHelmArgs = append(defaultHelmArgs, model.DefaultClusterSizeArg...)
+	defaultHelmArgs = append(defaultHelmArgs, resources.ApocClusterTestConfig.HelmArgs()...)
+	//defaultHelmArgs = append(defaultHelmArgs, model.CustomApocImageArgs...)
+	core1 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 1), defaultHelmArgs}
+	core2 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 2), defaultHelmArgs}
+	core3 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 3), defaultHelmArgs}
+	cores := []clusterCore{core1, core2, core3}
+
+	t.Cleanup(clusterTestCleanup(t, clusterReleaseName, core1, core2, core3))
+
+	t.Logf("Starting setup of '%s'", t.Name())
+
+	closeable, err := prepareK8s(t, clusterReleaseName)
+	addCloseable(closeable)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// Install one core synchronously, if all cores are installed simultaneously they run into conflicts all trying to create a -auth secret
+	result := core1.Install(t)
+	addCloseable(result.Closeable)
+	if !assert.NoError(t, result.error) {
+		return
+	}
+
+	componentsToParallelInstall := []helmComponent{core2, core3}
+	closeablesNew, err := performBackgroundInstall(t, componentsToParallelInstall, clusterReleaseName)
+	if !assert.NoError(t, err) {
+		return
+	}
+	addCloseable(closeablesNew...)
+
+	for _, core := range cores {
+		err = run(t, "kubectl", "--namespace", string(core.Name().Namespace()), "rollout", "status", "--watch", "--timeout=180s", "statefulset/"+core.Name().String())
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	t.Logf("Succeeded with setup of '%s'", t.Name())
+
+	subTests := apocConfigTests(clusterReleaseName)
+	if !assert.NoError(t, err) {
+		return
+	}
+	runSubTests(t, subTests)
+
+	t.Logf("Succeeded running all apoc config tests in '%s'", t.Name())
 }
 
 func clusterTestCleanup(t *testing.T, clusterReleaseName model.ReleaseName, core1 clusterCore, core2 clusterCore, core3 clusterCore) func() {
@@ -123,72 +191,4 @@ func clusterTestCleanup(t *testing.T, clusterReleaseName model.ReleaseName, core
 			{"delete", "priorityClass", "high-priority", "--force", "--grace-period=0"},
 		}, false)
 	}
-}
-
-func TestInstallNeo4jClusterWithApocConfigInGcloud(t *testing.T) {
-	if model.Neo4jEdition != "enterprise" {
-		t.Skip()
-		return
-	}
-
-	//if we make this in parallel with the other cluster tests , it will fail
-	// we need to wait for this cluster test to complete so that the other cluster test can complete
-	//t.Parallel()
-
-	var closeables []Closeable
-	addCloseable := func(closeableList ...Closeable) {
-		for _, closeable := range closeableList {
-			closeables = append([]Closeable{closeable}, closeables...)
-		}
-	}
-
-	clusterReleaseName := model.NewReleaseName("apoc-cluster-" + TestRunIdentifier)
-	loadBalancer := clusterLoadBalancer{model.NewLoadBalancerReleaseName(clusterReleaseName), nil}
-
-	apocCustomArgs := append(model.CustomApocImageArgs, resources.ApocClusterTestConfig.HelmArgs()...)
-	core1 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 1), apocCustomArgs}
-	core2 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 2), apocCustomArgs}
-	core3 := clusterCore{model.NewCoreReleaseName(clusterReleaseName, 3), apocCustomArgs}
-	cores := []clusterCore{core1, core2, core3}
-
-	t.Cleanup(func() { cleanupTest(t, AsCloseable(closeables)) })
-
-	t.Logf("Starting setup of '%s'", t.Name())
-
-	closeable, err := prepareK8s(t, clusterReleaseName)
-	addCloseable(closeable)
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	// Install one core synchronously, if all cores are installed simultaneously they run into conflicts all trying to create a -auth secret
-	result := core1.Install(t)
-	addCloseable(result.Closeable)
-	if !assert.NoError(t, result.error) {
-		return
-	}
-
-	componentsToParallelInstall := []helmComponent{core2, core3, loadBalancer}
-	closeablesNew, err := performBackgroundInstall(t, componentsToParallelInstall, clusterReleaseName)
-	if !assert.NoError(t, err) {
-		return
-	}
-	addCloseable(closeablesNew...)
-
-	for _, core := range cores {
-		err = run(t, "kubectl", "--namespace", string(core.Name().Namespace()), "rollout", "status", "--watch", "--timeout=180s", "statefulset/"+core.Name().String())
-		if !assert.NoError(t, err) {
-			return
-		}
-	}
-
-	t.Logf("Succeeded with setup of '%s'", t.Name())
-
-	subTests := apocConfigTests(loadBalancer.Name())
-	if !assert.NoError(t, err) {
-		return
-	}
-	runSubTests(t, subTests)
-
-	t.Logf("Succeeded running all apoc config tests in '%s'", t.Name())
 }

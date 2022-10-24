@@ -67,7 +67,7 @@ spec:
           image: "{{ $neo4jImage }}"
           {{- end }}
           {{- if not ( hasKey $initContainer "volumeMounts") }}
-          volumeMounts: {{ include "neo4j.volumeMounts" | nindent 12 }}
+          volumeMounts: {{ include "neo4j.volumeMounts" ( omit $.Values.volumes "logs" "metrics" ) | nindent 12 }}
           {{- end }}
         {{- end }}
         {{- end }}
