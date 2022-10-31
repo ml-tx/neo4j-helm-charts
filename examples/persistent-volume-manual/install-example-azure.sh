@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 readonly PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$0")")")"
-readonly RELEASE_NAME=volume-selector
+readonly RELEASE_NAME=volume-manual
 readonly AKS_CLUSTER_NAME=${1?' Azure AKS cluster name must be 1st argument'}
 readonly AZ_RESOURCE_GROUP=${2?' Azure resource group must be 1st argument'}
 readonly AZ_LOCATION=${3?' Azure location must be 2nd argument'}
@@ -14,11 +14,11 @@ helm_install() {
         --set data.driver=disk.csi.azure.com \
         --set data.storageClassName="manual" \
         --set data.reclaimPolicy="Delete" \
-        --set data.createPvc=false \
-        --set data.createStorageClass=true \
+        --set data.createPvc=true \
+        --set data.createStorageClass=false \
         --set data.volumeHandle="${disk_id}" \
         --set data.capacity.storage=10Gi
-    helm install  "${RELEASE_NAME}" neo4j -f examples/persistent-volume-selector/persistent-volume-selector.yaml
+        helm install "${RELEASE_NAME}" neo4j -f examples/persistent-volume-manual/persistent-volume-manual.yaml
 }
 
 helm_install
