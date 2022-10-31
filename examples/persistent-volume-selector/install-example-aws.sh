@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 readonly PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$0")")")"
 readonly RELEASE_NAME=volume-selector
-readonly AWS_ZONE="eu-west-1c"
+readonly AWS_ZONE=${1?' AWS zone must be 1st argument'}
 helm_install() {
     pushd "${PROJECT_ROOT}" > /dev/null || exit
     local -r volumeId=$(aws ec2 create-volume \
