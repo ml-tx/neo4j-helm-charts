@@ -18,7 +18,7 @@ helm_install() {
         --set data.createStorageClass=true \
         --set data.volumeHandle="${disk_id}" \
         --set data.capacity.storage=10Gi
-    helm install  "${RELEASE_NAME}" neo4j -f examples/persistent-volume-selector/persistent-volume-selector.yaml
+    helm install  "${RELEASE_NAME}" neo4j -f examples/persistent-volume-selector-standalone/persistent-volume-selector.yaml
 }
 
 helm_install
