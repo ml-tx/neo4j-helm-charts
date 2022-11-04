@@ -4,7 +4,7 @@ readonly AKS_LOCATION=${1?' Azure location must be 1st argument'}
 readonly AKS_GROUP=multiClusterGroup
 readonly VNET_NAME=multiClusterVnet
 readonly GATEWAY_NAME=multiClusterGateway
-readonly PASSWORD=$(cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 10 | head -n 1)
+readonly PASSWORD=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 10 | head -n 1)
 
 setup_clusters() {
     echo "Creating resource group ${AKS_GROUP}"
