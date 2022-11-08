@@ -4,7 +4,7 @@ kind: PersistentVolume
 apiVersion: v1
 metadata:
   # n.b. persistent volumes don't seem to belong to namespaces
-  name: "{{ $.Release.Name }}-ops"
+  name: "{{ include "neo4j.nameOverride" $ }}-ops"
   labels:
     helm.neo4j.com/volume-role: "ops"
     app: "{{ template "neo4j.appName" $ }}"
@@ -21,13 +21,13 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "{{ $.Release.Name }}-ops"
+  name: "{{ include "neo4j.nameOverride" $ }}-ops"
   labels:
     helm.neo4j.com/volume-role: "ops"
     app: "{{ template "neo4j.appName" $ }}"
 spec:
   storageClassName: "{{ .storageClassName }}"
-  volumeName: "{{ $.Release.Name }}-ops"
+  volumeName: "{{ include "neo4j.nameOverride" $ }}-ops"
   accessModes:
     - ReadWriteMany
   resources:

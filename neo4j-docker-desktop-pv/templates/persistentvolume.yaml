@@ -2,7 +2,7 @@ kind: "PersistentVolume"
 apiVersion: "v1"
 metadata:
   # n.b. persistent volumes don't seem to belong to namespaces
-  name: "{{ .Release.Name }}"
+  name: "{{ include "neo4j.nameOverride" . }}"
   labels:
     app: "{{ template "neo4j.appName" . }}"
     helm.neo4j.com/volume-role: "data"
@@ -19,13 +19,13 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "{{ .Release.Name }}"
+  name: "{{ include "neo4j.nameOverride" . }}"
   labels:
     app: "{{ template "neo4j.appName" . }}"
     helm.neo4j.com/volume-role: "data"
 spec:
   storageClassName: ""
-  volumeName: "{{ .Release.Name }}"
+  volumeName: "{{ include "neo4j.nameOverride" . }}"
   accessModes:
     - ReadWriteOnce
   resources:

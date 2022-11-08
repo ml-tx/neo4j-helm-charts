@@ -159,7 +159,7 @@ chmod -R g+rwx "/{{ $name }}"
     defaultMode: 0440
     sources:
       - configMap:
-          name: "{{ .Release.Name }}-apoc-config"
+          name: "{{ include "neo4j.nameOverride" . }}-apoc-config"
      {{- end -}}
 {{- end -}}
 

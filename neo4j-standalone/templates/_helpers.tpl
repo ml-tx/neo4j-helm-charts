@@ -12,7 +12,7 @@ Convert a neo4j.conf properties text into valid yaml
 {{- end -}}
 
 {{- define "neo4j.appName" -}}
-  {{- .Values.neo4j.name | default .Release.Name }}
+  {{- include "neo4j.nameOverride" . }}
 {{- end -}}
 
 {{- define "neo4j.cluster.server_groups" -}}
@@ -59,7 +59,7 @@ If no name is set in `Values.neo4j.name` sets it to release name and modifies Va
 */}}
 {{- define "neo4j.name" -}}
   {{- if not .Values.neo4j.name }}
-    {{- $name := .Release.Name }}
+    {{- $name := ( include "neo4j.nameOverride" . ) }}
     {{- $ignored := set .Values.neo4j "name" $name }}
   {{- end -}}
   {{- .Values.neo4j.name }}

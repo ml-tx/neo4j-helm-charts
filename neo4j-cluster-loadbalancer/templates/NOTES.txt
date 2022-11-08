@@ -14,7 +14,7 @@
 
 Thank you for installing {{ .Chart.Name }}.
 
-Your release "{{ .Release.Name }}" has been installed in namespace "{{ .Release.Namespace }}".
+Your release "{{ include "neo4j.nameOverride" . }}" has been installed in namespace "{{ .Release.Namespace }}".
 
 {{ else -}}
 
@@ -23,7 +23,7 @@ You have updated {{ .Chart.Name }} in namespace "{{ .Release.Namespace }}".
 {{ end -}}
 
 To view the status of your Load Balancer service you can use
-  $ kubectl get service{{ template "neo4j.namespaceParameter" . }} {{ .Release.Name }}-neo4j
+  $ kubectl get service{{ template "neo4j.namespaceParameter" . }} {{ include "neo4j.nameOverride" . }}-neo4j
 
 Once your Load Balancer has an External-IP assigned you can connect to your Neo4j cluster using "neo4j://<EXTERNAL-IP>:{{ $boltPort }}". Try:
 

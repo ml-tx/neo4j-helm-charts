@@ -26,7 +26,7 @@ LoadBalancer:
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Release.Name }}-neo4j"
+  name: "{{ include "neo4j.nameOverride" . }}-neo4j"
   namespace: "{{ .Release.Namespace }}"
   labels:
     helm.neo4j.com/neo4j.name: "{{ template "neo4j.name" $ }}"
